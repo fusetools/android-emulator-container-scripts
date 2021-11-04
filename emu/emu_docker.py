@@ -95,8 +95,7 @@ def create_docker_image(args):
         if args.sys:
             continue
 
-        emu_docker = EmulatorContainer(
-            emu, sys_docker, args.repo, cfg.collect_metrics(), args.extra, args.name)
+        emu_docker = EmulatorContainer(emu, sys_docker, args.repo, cfg.collect_metrics(), args.extra)
         emu_docker.build(args.dest)
 
         if args.start:
@@ -220,8 +219,7 @@ def main():
         help="Starts the container after creating it. "
         "All exposed ports are forwarded, and your private adbkey (if available) is injected but not stored.",
     )
-    create_parser.add_argument(
-        "--name", help="Name to give image when pushed.", default=None)
+    create_parser.add_argument("--sys", action="store_true", help="Process system image layer only.")
     create_parser.set_defaults(func=create_docker_image)
 
     create_inter = subparsers.add_parser(
