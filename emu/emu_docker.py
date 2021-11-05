@@ -18,34 +18,52 @@ import argparse
 import itertools
 import logging
 import os
-import sys
 import re
+import sys
+from typing import List
 
 import click
 import colorlog
 
 import emu
 import emu.emu_downloads_menu as emu_downloads_menu
-from emu.docker_config import DockerConfig
-from emu.cloud_build import cloud_build
+from emu.cloud_build import ArgsCreateCloudBuildDistribuition, cloud_build
 from emu.containers.emulator_container import EmulatorContainer
 from emu.containers.system_image_container import SystemImageContainer
+from emu.docker_config import DockerConfig
 
 
-def list_images(args):
+class ArgsListImages(argparse.Namespace):
+    arm: bool
+
+
+class ArgsAcceptLicenses(argparse.Namespace):
+    accept: bool
+
+
+class ArgsCreateDockerImage(argparse.Namespace):
+    imgzip: str
+    emuzip: str
+
+
+class ArgsCreateDockerImageInteractive(argparse.Namespace):
+    pass
+
+
+def list_images(args: ArgsListImages):
     """Lists all the publicly available system and emlator images."""
     emu_downloads_menu.list_all_downloads(args.arm)
 
 
-def accept_licenses(args):
+def accept_licenses(args: ArgsAcceptLicenses):
     emu_downloads_menu.accept_licenses(args.accept)
 
 
-def create_cloud_build_distribuition(args):
+def create_cloud_build_distribuition(args: ArgsCreateCloudBuildDistribuition):
     cloud_build(args)
 
 
-def metrics_config(args):
+def metrics_config(args: ArgsCreateDockerImage):
     cfg = DockerConfig()
     if args.metrics:
         cfg.set_collect_metrics(True)
@@ -62,25 +80,26 @@ def metrics_config(args):
     return cfg
 
 
-def create_docker_image(args):
+def create_docker_image(args: ArgsCreateDockerImage):
     """Create a directory containing all the necessary ingredients to construct a docker image.
 
     Returns the created DockerDevice objects.
     """
     cfg = metrics_config(args)
-    imgzip = [args.imgzip]
+    imgzip: List[str] = [args.imgzip]
     if not os.path.exists(imgzip[0]):
         imgzip = emu_downloads_menu.find_image(imgzip[0])
 
-    emuzip = [args.emuzip]
+    emuzip: List[str] = [args.emuzip]
     if emuzip[0] in ["stable", "canary", "all"]:
-        emuzip = [x.download() for x in emu_downloads_menu.find_emulator(emuzip[0])]
+        emuzip = [x.download()
+                  for x in emu_downloads_menu.find_emulator(emuzip[0])]
     elif re.match(r"\d+", emuzip[0]):
         # We must be looking for a build id
         logging.info("Treating %s as a build id", emuzip[0])
         emuzip = [emu_downloads_menu.download_build(emuzip[0])]
 
-    devices = []
+    devices: List[EmulatorContainer] = []
     logging.info("Using repo %s", args.repo)
     for (img, emu) in itertools.product(imgzip, emuzip):
         logging.info("Processing %s, %s", img, emu)
@@ -95,7 +114,8 @@ def create_docker_image(args):
         if args.sys:
             continue
 
-        emu_docker = EmulatorContainer(emu, sys_docker, args.repo, cfg.collect_metrics(), args.extra)
+        emu_docker = EmulatorContainer(
+            emu, sys_docker, args.repo, cfg.collect_metrics(), args.extra)
         emu_docker.build(args.dest)
 
         if args.start:
@@ -108,7 +128,7 @@ def create_docker_image(args):
     return devices
 
 
-def create_docker_image_interactive(args):
+def create_docker_image_interactive(args: ArgsCreateDockerImage):
     """Interactively create a docker image by selecting the desired combination from a menu."""
     img = emu_downloads_menu.select_image(args.arm) or sys.exit(1)
     emulator = emu_downloads_menu.select_emulator() or sys.exit(1)
@@ -140,10 +160,12 @@ def main():
     """Entry point that parses the argument, and invokes the proper functions."""
 
     parser = argparse.ArgumentParser(
-        description="List and create emulator docker containers ({}).".format(emu.__version__),
+        description="List and create emulator docker containers ({}).".format(
+            emu.__version__),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("-v", "--verbose", dest="verbose", action="store_true", help="Set verbose logging")
+    parser.add_argument("-v", "--verbose", dest="verbose",
+                        action="store_true", help="Set verbose logging", type=bool)
 
     subparsers = parser.add_subparsers()
 
@@ -155,13 +177,15 @@ def main():
         "--arm",
         action="store_true",
         help="Display arm images. Note that arm images are not hardware accelerated and are *extremely* slow.",
+        type=bool
     )
     list_parser.set_defaults(func=list_images)
 
     license_parser = subparsers.add_parser(
         "licenses", help="Lists all licenses and gives you a chance to accept or reject them."
     )
-    license_parser.add_argument("--accept", action="store_true", help="Accept all licensens after displaying them.")
+    license_parser.add_argument(
+        "--accept", action="store_true", help="Accept all licensens after displaying them.")
     license_parser.set_defaults(func=accept_licenses)
 
     create_parser = subparsers.add_parser(
@@ -192,7 +216,8 @@ def main():
     create_parser.add_argument(
         "--dest", default=os.path.join(os.getcwd(), "src"), help="Destination for the generated docker files"
     )
-    create_parser.add_argument("--tag", default="", help="Docker tag, defaults to the emulator build id")
+    create_parser.add_argument(
+        "--tag", default="", help="Docker tag, defaults to the emulator build id")
     create_parser.add_argument(
         "--repo",
         default="us-docker.pkg.dev/android-emulator-268719/images",
@@ -212,14 +237,16 @@ def main():
         action="store_true",
         help="When enabled, the emulator will send usage metrics to Google when the container exists gracefully.",
     )
-    create_parser.add_argument("--no-metrics", action="store_true", help="Disables the collection of usage metrics.")
+    create_parser.add_argument(
+        "--no-metrics", action="store_true", help="Disables the collection of usage metrics.")
     create_parser.add_argument(
         "--start",
         action="store_true",
         help="Starts the container after creating it. "
         "All exposed ports are forwarded, and your private adbkey (if available) is injected but not stored.",
     )
-    create_parser.add_argument("--sys", action="store_true", help="Process system image layer only.")
+    create_parser.add_argument(
+        "--sys", action="store_true", help="Process system image layer only.")
     create_parser.set_defaults(func=create_docker_image)
 
     create_inter = subparsers.add_parser(
@@ -269,7 +296,8 @@ def main():
     dist_parser.add_argument(
         "--dest", default=os.path.join(os.getcwd(), "src"), help="Destination for the generated docker files"
     )
-    dist_parser.add_argument("--git", action="store_true", help="Create a git commit, and push to destination.")
+    dist_parser.add_argument("--git", action="store_true",
+                             help="Create a git commit, and push to destination.")
     dist_parser.add_argument(
         "--sys", action="store_true", help="Write system image steps, otherwise write emulator steps."
     )
@@ -291,7 +319,8 @@ def main():
     # Configure logger.
     lvl = logging.DEBUG if args.verbose else logging.WARNING
     handler = colorlog.StreamHandler()
-    handler.setFormatter(colorlog.ColoredFormatter("%(log_color)s%(levelname)s:%(message)s"))
+    handler.setFormatter(colorlog.ColoredFormatter(
+        "%(log_color)s%(levelname)s:%(message)s"))
     logging.root = colorlog.getLogger("root")
     logging.root.addHandler(handler)
     logging.root.setLevel(lvl)

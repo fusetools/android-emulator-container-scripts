@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+from typing import Optional
 import zipfile
 
 from emu.utils import download
@@ -23,16 +24,17 @@ PLATFORM_TOOLS_URL = f'{os.environ.get("ANDROID_REPOSITORY", "https://dl.google.
 class PlatformTools(object):
     """The platform tools zip file. It will be downloaded on demand."""
 
-    def __init__(self, fname=None):
+    def __init__(self, fname: Optional[str] = None):
         self.platform = fname
 
-    def extract_adb(self, dest):
+    def extract_adb(self, dest: str):
         if not self.platform:
             self.platform = self.download()
         with zipfile.ZipFile(self.platform, "r") as plzip:
             plzip.extract("platform-tools/adb", dest)
 
-    def download(self, dest=None):
-        dest = dest or os.path.join(os.getcwd(), "platform-tools-latest-linux.zip")
+    def download(self, dest: Optional[str] = None):
+        dest = dest or os.path.join(
+            os.getcwd(), "platform-tools-latest-linux.zip")
         print("Downloading platform tools to {}".format(dest))
         return download(PLATFORM_TOOLS_URL, dest)

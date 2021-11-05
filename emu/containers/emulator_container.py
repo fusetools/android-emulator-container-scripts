@@ -11,12 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from _typeshed import StrPath
 import os
 import shutil
+from typing import Any, Dict, Optional
 
 import emu
 from emu.android_release_zip import AndroidReleaseZip
 from emu.containers.docker_container import DockerContainer
+from emu.containers.system_image_container import SystemImageContainer
 from emu.template_writer import TemplateWriter
 
 
@@ -30,7 +33,7 @@ class EmulatorContainer(DockerContainer):
         """
     NO_METRICS_MESSAGE = "No metrics are collected when running this container."
 
-    def __init__(self, emulator, system_image_container, repository=None, metrics=False, extra=""):
+    def __init__(self, emulator: StrPath, system_image_container: SystemImageContainer, repository: Optional[str] = None, metrics: bool = False, extra: str = ""):
         self.emulator_zip = AndroidReleaseZip(emulator)
         self.system_image_container = system_image_container
         self.metrics = metrics
@@ -38,7 +41,7 @@ class EmulatorContainer(DockerContainer):
         if type(extra) is list:
             extra = " ".join(extra)
 
-        cpu = system_image_container.image_labels()["ro.product.cpu.abi"]
+        cpu: str = system_image_container.image_labels()["ro.product.cpu.abi"]
         self.extra = self._logger_flags(cpu) + " " + extra
 
         metrics_msg = EmulatorContainer.NO_METRICS_MESSAGE
@@ -46,7 +49,7 @@ class EmulatorContainer(DockerContainer):
             self.extra += " -metrics-collection"
             metrics_msg = EmulatorContainer.METRICS_MESSAGE
 
-        self.props = system_image_container.image_labels()
+        self.props: Dict[str, Any] = system_image_container.image_labels()
         self.props["playstore"] = self.props["qemu.tag"] == "google_apis_playstore"
         self.props["metrics"] = metrics_msg
         self.props["emu_build_id"] = self.emulator_zip.build_id()
@@ -59,21 +62,22 @@ class EmulatorContainer(DockerContainer):
             "qemu.short_abi",
             "ro.product.cpu.abi",
         ]:
-            assert expect in self.props, "{} is not in {}".format(expect, self.props)
+            assert expect in self.props, "{} is not in {}".format(
+                expect, self.props)
 
         super().__init__(repository)
 
-    def _logger_flags(self, cpu):
+    def _logger_flags(self, cpu: str):
         if "arm" in cpu:
             return "-logcat *:V -show-kernel"
         else:
             return "-shell-serial file:/tmp/android-unknown/kernel.log -logcat-output /tmp/android-unknown/logcat.log"
 
-    def write(self, dest):
+    def write(self, destination: str):
         # Make sure the destination directory is empty.
-        self.clean(dest)
+        self.clean(destination)
 
-        writer = TemplateWriter(dest)
+        writer = TemplateWriter(destination)
         writer.write_template("avd/Pixel2.ini", self.props)
         writer.write_template("avd/Pixel2.avd/config.ini", self.props)
 
@@ -84,7 +88,8 @@ class EmulatorContainer(DockerContainer):
             rename_as="README.MD",
         )
 
-        writer.write_template("launch-emulator.sh", {"extra": self.extra, "version": emu.__version__})
+        writer.write_template("launch-emulator.sh",
+                              {"extra": self.extra, "version": emu.__version__})
         writer.write_template("default.pa", {})
 
         writer.write_template(
@@ -93,7 +98,7 @@ class EmulatorContainer(DockerContainer):
             rename_as="Dockerfile",
         )
 
-        self.emulator_zip.extract(os.path.join(dest, "emu"))
+        self.emulator_zip.extract(os.path.join(destination, "emu"))
 
     def image_name(self):
         name = "{}-{}-{}".format(

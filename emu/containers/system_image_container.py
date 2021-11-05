@@ -11,9 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from _typeshed import StrPath
 import logging
 import os
 import shutil
+from typing import Union
 
 from emu.android_release_zip import SystemImageReleaseZip
 from emu.platform_tools import PlatformTools
@@ -23,7 +25,7 @@ from emu.emu_downloads_menu import SysImgInfo
 
 
 class SystemImageContainer(DockerContainer):
-    def __init__(self, sort, repo="us-docker.pkg.dev/android-emulator-268719/images"):
+    def __init__(self, sort: Union[SysImgInfo, StrPath], repo: str = "us-docker.pkg.dev/android-emulator-268719/images"):
         super().__init__(repo)
         self.system_image_zip = None
         self.system_image_info = None
@@ -34,23 +36,24 @@ class SystemImageContainer(DockerContainer):
             self.system_image_zip = SystemImageReleaseZip(sort)
             assert "ro.build.version.incremental" in self.system_image_zip.props
 
-    def _copy_adb_to(self, dest):
+    def _copy_adb_to(self, dest: str):
         """Find adb, or download it if needed."""
         logging.info("Retrieving platform-tools")
         tools = PlatformTools()
         tools.extract_adb(dest)
 
-    def write(self, dest):
+    def write(self, destination: str):
         # We do not really want to overwrite if the files already exist.
         # Make sure the destination directory is empty.
         if self.system_image_zip is None:
-            self.system_image_zip = SystemImageReleaseZip(self.system_image_info.download(dest))
+            self.system_image_zip = SystemImageReleaseZip(
+                self.system_image_info.download(destination))
 
-        writer = TemplateWriter(dest)
-        self._copy_adb_to(dest)
+        writer = TemplateWriter(destination)
+        self._copy_adb_to(destination)
 
         props = self.system_image_zip.props
-        dest_zip = os.path.basename(self.system_image_zip.copy(dest))
+        dest_zip = os.path.basename(self.system_image_zip.copy(destination))
         props["system_image_zip"] = dest_zip
         writer.write_template(
             "Dockerfile.system_image",
@@ -58,12 +61,13 @@ class SystemImageContainer(DockerContainer):
             rename_as="Dockerfile",
         )
 
-    def image_name(self):
+    def image_name(self) -> str:
         if self.system_image_info:
             return self.system_image_info.image_name()
         if self.system_image_zip:
             return "sys-{}-{}-{}".format(
-                self.system_image_zip.api(), self.system_image_zip.short_tag(), self.system_image_zip.short_abi()
+                self.system_image_zip.api(), self.system_image_zip.short_tag(
+                ), self.system_image_zip.short_abi()
             )
 
     def docker_tag(self):

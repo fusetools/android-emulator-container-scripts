@@ -15,17 +15,14 @@
 # limitations under the License.
 import os
 import logging
-import platform
+from typing import IO, Any, List, Mapping, Optional, Tuple, Union
 
-try:
-    from queue import Queue
-except ImportError:
-    from Queue import Queue
+from queue import Queue
 import subprocess
 from threading import Thread
 
 
-def _reader(pipe, queue):
+def _reader(pipe: IO[bytes], queue: Queue[Union[Tuple[IO[bytes], bytes], None]]):
     try:
         with pipe:
             for line in iter(pipe.readline, b""):
@@ -34,9 +31,9 @@ def _reader(pipe, queue):
         queue.put(None)
 
 
-def log_std_out(proc):
+def log_std_out(proc: subprocess.Popen[bytes]):
     """Logs the output of the given process."""
-    q = Queue()
+    q: Queue[Union[Tuple[IO[bytes], bytes], None]] = Queue()
     Thread(target=_reader, args=[proc.stdout, q]).start()
     Thread(target=_reader, args=[proc.stderr, q]).start()
     for _ in range(2):
@@ -47,16 +44,18 @@ def log_std_out(proc):
                 pass
 
 
-def run(cmd, cwd=None, extra_env=None):
+def run(cmd: List[Any], cwd: Optional[str] = None, extra_env: Optional[Mapping[str, Any]] = None):
     if cwd:
         cwd = os.path.abspath(cwd)
 
     cmd = [str(c) for c in cmd]
 
     logging.info("Running: %s in %s", " ".join(cmd), cwd)
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd, env=extra_env)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, cwd=cwd, env=extra_env)
 
     log_std_out(proc)
     proc.wait()
     if proc.returncode != 0:
-        raise Exception("Failed to run %s - %s" % (" ".join(cmd), proc.returncode))
+        raise Exception("Failed to run %s - %s" %
+                        (" ".join(cmd), proc.returncode))

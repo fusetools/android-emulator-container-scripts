@@ -17,10 +17,7 @@
 from appdirs import user_config_dir
 import os
 
-try:
-    from configparser import ConfigParser
-except:
-    import ConfigParser
+from configparser import ConfigParser
 
 
 class DockerConfig(object):
@@ -36,29 +33,29 @@ class DockerConfig(object):
     def collect_metrics(self):
         return self._cfg_true("metrics")
 
-    def set_collect_metrics(self, to_collect):
+    def set_collect_metrics(self, to_collect: bool):
         self._set_cfg("metrics", str(to_collect))
 
     def decided_on_metrics(self):
         return self._has_cfg("metrics")
 
-    def accepted_license(self, license):
+    def accepted_license(self, license: str):
         return self._cfg_true(license)
 
-    def accept_license(self, license):
+    def accept_license(self, license: str):
         self._set_cfg(license)
 
-    def _cfg_true(self, label):
+    def _cfg_true(self, label: str):
         if self._has_cfg(label):
             return "True" in self.cfg["DEFAULT"][label]
         return False
 
-    def _set_cfg(self, label, state="True"):
+    def _set_cfg(self, label: str, state: str = "True"):
         self._load_config()
         self.cfg["DEFAULT"][label] = state
         self._save_config()
 
-    def _has_cfg(self, label):
+    def _has_cfg(self, label: str):
         return label in self.cfg["DEFAULT"]
 
     def _save_config(self):

@@ -11,12 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from _typeshed import StrPath
+import argparse
 import itertools
 import logging
 import os
 import re
+from typing import Any, Dict, List, Set
 
 import yaml
+from emu.containers.docker_container import DockerContainer
 
 import emu.emu_downloads_menu as emu_downloads_menu
 from emu.template_writer import TemplateWriter
@@ -27,7 +31,7 @@ from emu.emu_downloads_menu import accept_licenses
 from emu.utils import mkdir_p
 
 
-def git_commit_and_push(dest):
+def git_commit_and_push(dest: str):
     """Commit and pushes this cloud build to the git repo.
 
     Note that this can be *EXTREMELY* slow as you will likely
@@ -41,7 +45,7 @@ def git_commit_and_push(dest):
     run(["git", "push"], dest)
 
 
-def create_build_step(for_container, destination):
+def create_build_step(for_container: DockerContainer, destination: StrPath) -> Dict[str, Any]:
     build_destination = os.path.join(destination, for_container.image_name())
     logging.info("Generating %s", build_destination)
     for_container.write(build_destination)
@@ -56,7 +60,15 @@ def create_build_step(for_container, destination):
     return step
 
 
-def cloud_build(args):
+class ArgsCreateCloudBuildDistribuition(argparse.Namespace):
+    dest: str
+    img: str
+    repo: str
+    sys: bool
+    emuzip: str
+
+
+def cloud_build(args: ArgsCreateCloudBuildDistribuition):
     """Prepares the cloud build yaml and all its dependencies.
 
     The cloud builder will generate a single cloudbuild.yaml and generates the build
@@ -76,15 +88,16 @@ def cloud_build(args):
 
     emulator_zip = [args.emuzip]
     if emulator_zip[0] in ["stable", "canary", "all"]:
-        emulator_zip = [x.download() for x in emu_downloads_menu.find_emulator(emulator_zip[0])]
+        emulator_zip = [x.download()
+                        for x in emu_downloads_menu.find_emulator(emulator_zip[0])]
     elif re.match(r"\d+", emulator_zip[0]):
         # We must be looking for a build id
         logging.warning("Treating %s as a build id", emulator_zip[0])
         emulator_zip = [emu_downloads_menu.download_build(emulator_zip[0])]
 
-    steps = []
-    images = []
-    emulators = set()
+    steps: List[Dict[str, Any]] = []
+    images: List[str] = []
+    emulators: Set[str] = set()
     emulator_images = []
 
     for (img, emu) in itertools.product(image_zip, emulator_zip):
@@ -94,7 +107,8 @@ def cloud_build(args):
             steps.append(create_build_step(system_container, args.dest))
         else:
             for metrics in [True, False]:
-                emulator_container = EmulatorContainer(emu, system_container, args.repo, metrics)
+                emulator_container = EmulatorContainer(
+                    emu, system_container, args.repo, metrics)
                 emulators.add(emulator_container.props["emu_build_id"])
                 steps.append(create_build_step(emulator_container, args.dest))
                 images.append(emulator_container.full_name())
@@ -110,7 +124,8 @@ def cloud_build(args):
     writer = TemplateWriter(args.dest)
     writer.write_template(
         "cloudbuild.README.MD",
-        {"emu_version": ", ".join(emulators), "emu_images": "\n".join(["* {}".format(x) for x in emulator_images])},
+        {"emu_version": ", ".join(emulators), "emu_images": "\n".join(
+            ["* {}".format(x) for x in emulator_images])},
         rename_as="README.MD",
     )
     writer.write_template(
