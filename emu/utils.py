@@ -38,13 +38,13 @@ API_LETTER_MAPPING = {
 }
 
 
-def mkdir_p(path):
+def mkdir_p(path: str):
     """Make directories recursively if path not exists."""
     if not os.path.exists(path):
         os.makedirs(path)
 
 
-def download(url, dest):
+def download(url: str, dest: str):
     """Downloads the given url to the given destination with a progress bar.
 
     This function will immediately return if the file already exists.
@@ -63,7 +63,7 @@ def download(url, dest):
     return dest
 
 
-def api_codename(api):
+def api_codename(api: str):
     """First letter of the desert, if any."""
     if api in API_LETTER_MAPPING:
         return API_LETTER_MAPPING[api]
