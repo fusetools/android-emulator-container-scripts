@@ -99,8 +99,11 @@ class DockerContainer:
                 "build(path=%s, tag=%s, rm=True, decode=True)", dest, image_tag
             )
             result = api_client.build(
-                path=str(dest.absolute()), tag=image_tag, rm=True, decode=True,
-                platform=DockerContainer.DEFAULT_PLATFORM
+                path=str(dest.absolute()),
+                tag=image_tag,
+                rm=True,
+                decode=True,
+                platform=DockerContainer.DEFAULT_PLATFORM,
             )
             for entry in result:
                 if "stream" in entry and entry["stream"].strip():
@@ -162,7 +165,7 @@ class DockerContainer:
         if local:
             return local.tags[0]
 
-        return ""
+        return self.image_name()
 
     def latest_name(self):
         if self.repo:
